@@ -1,0 +1,3 @@
+# Fill only in your local environment or Cloudflare Secrets. Never commit values.
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
