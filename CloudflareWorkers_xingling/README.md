@@ -25,7 +25,7 @@ GitHub 登录在此处只用于核实身份，申请 read:user，不用于写入
 
 确认成功后，通过你自己的 GitHub 登录提交并推送。
 
-服务诊断版本为 1.2.1，存储引擎仍为 1.2.0。真实依赖安装已完成，23 项本地测试和 Wrangler deploy --dry-run 打包通过，已生成 package-lock.json。新增集成测试使用真实 OAuth Provider 1.2.4 与加密/Cookie 流程；KV、GitHub 和 R2 仍用本地测试替身，不能当作真实账号登录或跨设备验收。npm run build 只检查项目配置。请将 package-lock.json 一同提交。
+服务版本为 1.2.2，存储引擎仍为 1.2.0。真实依赖安装已完成，24 项本地测试和 Wrangler deploy --dry-run 打包通过，已生成 package-lock.json。新增集成测试使用真实 OAuth Provider 1.2.4 与加密/Cookie 流程；KV、GitHub 和 R2 仍用本地测试替身，不能当作真实账号登录或跨设备验收。npm run build 只检查项目配置。请将 package-lock.json 一同提交。
 
 ## 2. Cloudflare 的 GitHub 部署页面
 
@@ -91,7 +91,7 @@ wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提�
 - src/auth.js：每客户端授权、GitHub 登录、允许账号核验
 - src/api.js：只接受已验证 OAuth 上下文的 MCP 接口，执行读/写权限检查
 - src/store.js：人格数据校验、独立修订、ETag 条件写入、幂等与回滚
-- test/：23 项本地测试，包含真实 OAuth Provider 授权流程与安全错误诊断
+- test/：24 项本地测试，包含真实 OAuth Provider 授权流程与安全错误诊断
 - scripts/configure.mjs：填写真实 Worker URL 和 OAuth KV ID
 - wrangler.jsonc：Cloudflare 部署与绑定配置
 
@@ -123,4 +123,12 @@ wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提�
 | AUTH_TRANSACTION_EXPIRED | 授权已用、过期或 KV 中状态不可用 | 发起全新关联；若立即失败，保留 Stage 检查 KV |
 | AUTH_SERVICE_ERROR | 服务内部或存储操作抛出异常 | 用 Stage 定位；HTTP 503，不应一概归咎于用户会话过期 |
 
-当前尚未确定用户线上失败的具体原因。本次是诊断改进，不代表线上关联问题已解决。新云端插件、现有 R2 数据和 Persona Revision 无需重建或重置。
+1.2.2 已在真实 Edge 中复现并修复授权页 CSP 阻断表单后续跳转的问题。此前的 Cookie 缺失仍应以重新关联的实际结果确认。新云端插件、现有 R2 数据和 Persona Revision 无需重建或重置。
+
+## 1.2.2 授权页 CSP 修复
+
+Chromium/Edge 会将表单提交后的重定向纳入 form-action 检查。原策略只允许 self，服务同意后虽已返回 302，浏览器仍阻止进入 GitHub；拒绝后返回客户端也受相同限制。现仅允许 self、GitHub 来源和库已验证的本次 OAuth redirectUri 来源；回调来源不从客户端名称、显示网址或表单字段取得。保持 default-src none、frame-ancestors none、base-uri none 及浏览器绑定校验。
+
+24 项 Node 测试通过。独立 Edge 测试验证 Cookie 保存与回传、同意进入模拟 GitHub、拒绝进入模拟客户端回调；测试拦截网络并使用本地数据，不登录真实 GitHub，也不读写云端人格。运行 npm run test:browser；默认使用本机 Edge，可通过 XINGLENG_TEST_BROWSER 指定 Chromium 可执行文件。测试使用独立浏览器配置目录（位于已忽略的 .wrangler 下）和仅本机可访问的临时调试端口。
+
+提交并 push 后，确认 /health 中 service_version=1.2.2，再从插件发起新的授权页。修复后的线上 OAuth 登录和跨设备读写仍需验收；本地浏览器测试不代表云端已连接。

@@ -7,6 +7,15 @@ function consent(details,handle) {
   const scopes=details.scope.map(s=>'<label><input type="checkbox" name="scope" value="'+escape(s)+'" checked> '+escape(s)+'</label><br>').join('');
   return '<!doctype html><meta charset="utf-8"><title>星棱人格库授权</title><h1>授权访问星棱人格库</h1><p>客户端：'+escape(details.clientName)+'</p><p>客户端来源：'+escape(details.clientDomain||'自行注册的客户端，名称未经验证')+'</p><p>授权返回地址：'+escape(details.redirectHost)+'</p>'+(details.redirectIsLoopback?'<p>此授权将返回本机应用，请确认是你刚发起的连接。</p>':'')+'<p>读取：查看长期设定。写入：在你逐项明确确认后保存或回滚。此授权不替代每条设定的确认。</p><form method="post"><input type="hidden" name="handle" value="'+escape(handle)+'">'+scopes+'<button name="decision" value="approve">同意并用 GitHub 登录</button> <button name="decision" value="deny">拒绝</button></form>';
 }
+function consentPolicy(redirectUri) {
+  // Chromium also applies form-action to redirects after the POST. The callback
+  // comes from the library-validated request, never from client display metadata.
+  const callback=new URL(redirectUri);
+  const callbackSource=callback.origin==='null'?callback.protocol:callback.origin;
+  if(/[\s;'"]/.test(callbackSource))throw new TypeError('Invalid callback CSP source');
+  const destinations=[...new Set(["'self'",'https://github.com',callbackSource])];
+  return "default-src 'none'; form-action "+destinations.join(' ')+"; frame-ancestors 'none'; base-uri 'none'";
+}
 async function s256(value) {
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
   return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -48,7 +57,7 @@ export async function authHandler(request,env,fetcher=fetch) {
       stage='consent_begin';
       const flow=await oauth.beginConsent(info);
       flow.headers.set('Content-Type','text/html; charset=utf-8');
-      flow.headers.set('Content-Security-Policy',"default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+      flow.headers.set('Content-Security-Policy',consentPolicy(info.redirectUri));
       return new Response(consent(details,flow.handle),{headers:flow.headers});
     }
     if(url.pathname==='/authorize'&&request.method==='POST') {

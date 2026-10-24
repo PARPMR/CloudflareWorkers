@@ -15,7 +15,7 @@ test('verified identity must match owner and writes require scope',async()=>{
  assert.equal((await apiHandler(req('xingleng_persona_commit'),bindings,{props:{githubId:'129664964'},auth:{scope:['mcp:read']}},challenge)).status,403);
 });
 test('consent escapes client metadata and prevents framing',async()=>{
- const oauth={parseAuthRequest:async()=>({}),describeConsent:async()=>({clientName:'<script>bad()</script>',redirectHost:'client.example',scope:['mcp:read']}),beginConsent:async()=>({handle:'handle',headers:new Headers()})};
+ const oauth={parseAuthRequest:async()=>({redirectUri:'https://client.example/callback'}),describeConsent:async()=>({clientName:'<script>bad()</script>',redirectHost:'client.example',redirectUri:'https://client.example/callback',scope:['mcp:read']}),beginConsent:async()=>({handle:'handle',headers:new Headers()})};
  const res=await authHandler(new Request('https://persona.example/authorize'),{PUBLIC_BASE_URL:'https://persona.example',OAUTH_PROVIDER:oauth});
  const body=await res.text();
  assert.ok(body.includes('&#60;script&#62;'));assert.ok(!body.includes('<script>bad()'));
@@ -35,3 +35,19 @@ test('callback authorizes only configured numeric owner and does not retain upst
  assert.ok(!JSON.stringify(completed).includes('test-only'));
 });
 
+
+
+test('consent CSP allows GitHub and only the validated callback origin for form redirects',async()=>{
+ for(const redirectUri of ['https://client.example:8443/callback','http://127.0.0.1:43119/callback']) {
+  const oauth={parseAuthRequest:async()=>({redirectUri}),describeConsent:async()=>({clientName:'untrusted.example',redirectHost:new URL(redirectUri).hostname,redirectUri,scope:['mcp:read']}),beginConsent:async()=>({handle:'test-only',headers:new Headers()})};
+  const response=await authHandler(new Request('https://persona.example/authorize'),{PUBLIC_BASE_URL:'https://persona.example',OAUTH_PROVIDER:oauth});
+  assert.equal(response.status,200);
+  const policy=response.headers.get('Content-Security-Policy');
+  const destinations=policy.split(';').map(x=>x.trim()).find(x=>x.startsWith('form-action ')).split(/\s+/).slice(1);
+  assert.deepEqual(destinations,["'self'",'https://github.com',new URL(redirectUri).origin]);
+  assert.ok(policy.includes("default-src 'none'"));
+  assert.ok(policy.includes("frame-ancestors 'none'"));
+  assert.ok(policy.includes("base-uri 'none'"));
+  assert.ok(!policy.includes('untrusted.example'));
+ }
+});

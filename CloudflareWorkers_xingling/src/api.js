@@ -18,7 +18,7 @@ export async function apiHandler(request,env,ctx,insufficientScope) {
   let result;
   if(rpc.method==='initialize') {
     const supported=['2026-07-28','2025-11-25','2025-06-18','2025-03-26','2024-11-05'];
-    result={protocolVersion:supported.includes(rpc.params?.protocolVersion)?rpc.params.protocolVersion:'2026-07-28',serverInfo:{name:'xingleng-persona-memory',version:'1.2.1'},capabilities:{tools:{}}};
+    result={protocolVersion:supported.includes(rpc.params?.protocolVersion)?rpc.params.protocolVersion:'2026-07-28',serverInfo:{name:'xingleng-persona-memory',version:'1.2.2'},capabilities:{tools:{}}};
   }else if(rpc.method==='server/discover')result={supportedVersions:['2026-07-28'],capabilities:{tools:{}}};
   else if(rpc.method==='ping')result={};
   else if(rpc.method==='tools/list')result={tools};
