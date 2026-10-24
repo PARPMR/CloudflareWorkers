@@ -25,7 +25,7 @@ GitHub 登录在此处只用于核实身份，申请 read:user，不用于写入
 
 确认成功后，通过你自己的 GitHub 登录提交并推送。
 
-本环境的依赖下载失败，因此尚未完成真实依赖安装、Wrangler 打包或部署验证。此包的 15 项本地测试通过，但使用模拟 OAuth 助手和模拟 R2；测试不等于完整登录或真实跨设备验收。没有生成 package-lock.json，请在你联网安装成功后将它一起提交。npm run build 只检查项目配置；真正的 JavaScript 打包由 wrangler deploy 执行。
+服务诊断版本为 1.2.1，存储引擎仍为 1.2.0。真实依赖安装已完成，23 项本地测试和 Wrangler deploy --dry-run 打包通过，已生成 package-lock.json。新增集成测试使用真实 OAuth Provider 1.2.4 与加密/Cookie 流程；KV、GitHub 和 R2 仍用本地测试替身，不能当作真实账号登录或跨设备验收。npm run build 只检查项目配置。请将 package-lock.json 一同提交。
 
 ## 2. Cloudflare 的 GitHub 部署页面
 
@@ -91,7 +91,7 @@ wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提�
 - src/auth.js：每客户端授权、GitHub 登录、允许账号核验
 - src/api.js：只接受已验证 OAuth 上下文的 MCP 接口，执行读/写权限检查
 - src/store.js：人格数据校验、独立修订、ETag 条件写入、幂等与回滚
-- test/：15 项本地测试
+- test/：23 项本地测试，包含真实 OAuth Provider 授权流程与安全错误诊断
 - scripts/configure.mjs：填写真实 Worker URL 和 OAuth KV ID
 - wrangler.jsonc：Cloudflare 部署与绑定配置
 
@@ -103,9 +103,24 @@ wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提�
 
 ## 技术依据
 
-采用 Cloudflare 官方 @cloudflare/workers-oauth-provider 1.2.4，使用该库的 consent/upstream 浏览器绑定助手，包含 PKCE。服务目前仍需真实依赖、登录及客户端连接验收。
+采用 Cloudflare 官方 @cloudflare/workers-oauth-provider 1.2.4，使用该库的 consent/upstream 浏览器绑定助手，包含 PKCE。真实依赖安装和本地打包已验证；线上登录及客户端连接仍需验收。
 
 - https://github.com/cloudflare/workers-oauth-provider
 - https://github.com/cloudflare/workers-oauth-provider/blob/main/docs/upstream-sign-in.md
 - https://github.com/cloudflare/workers-oauth-provider/blob/main/docs/consent-page.md
 - https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#conditional-operations
+
+## 1.2.1 授权故障诊断
+
+旧版将所有异常统一显示为 Authorization failed or expired，无法判断是否确实过期。本版保持浏览器绑定与一次性授权校验，增加固定 Error code 和 Stage，并在 Worker 日志中仅记录对应编号；不记录 Cookie、handle、state、授权码、密钥或原始异常。
+
+部署后先确认 /health 的 service_version 为 1.2.1，再从插件发起全新的关联；不要刷新或重交旧授权页。若失败，只提供 Error code 和 Stage。
+
+| Error code | 含义 | 下一步 |
+| --- | --- | --- |
+| AUTH_BROWSER_COOKIE_MISSING | 缺少本次授权绑定的 Cookie | 在同一浏览器窗口重新关联，检查本站 Cookie 设置 |
+| AUTH_BROWSER_COOKIE_MISMATCH | Cookie 与当前授权不匹配 | 从插件重新发起，不复用旧页面 |
+| AUTH_TRANSACTION_EXPIRED | 授权已用、过期或 KV 中状态不可用 | 发起全新关联；若立即失败，保留 Stage 检查 KV |
+| AUTH_SERVICE_ERROR | 服务内部或存储操作抛出异常 | 用 Stage 定位；HTTP 503，不应一概归咎于用户会话过期 |
+
+当前尚未确定用户线上失败的具体原因。本次是诊断改进，不代表线上关联问题已解决。新云端插件、现有 R2 数据和 Persona Revision 无需重建或重置。

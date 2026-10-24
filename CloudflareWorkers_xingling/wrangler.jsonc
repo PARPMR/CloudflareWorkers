@@ -16,7 +16,8 @@
   ],
   "vars": {
     "PUBLIC_BASE_URL": "https://xingleng-persona-memory.3350532354.workers.dev",
-    "ALLOWED_GITHUB_USER_ID": "129664964"
+    "ALLOWED_GITHUB_USER_ID": "129664964",
+    "GITHUB_CLIENT_ID": "Ov23liUFJTJ7IYWrHXRo"
   },
   "kv_namespaces": [
     {
