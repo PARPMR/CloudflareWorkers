@@ -1,1 +1,27 @@
-{"$schema":"node_modules/wrangler/config-schema.json","name":"xingleng-persona-memory","account_id":"ff52687595b64f602482d84cd351446a","main":"src/index.js","compatibility_date":"2026-10-23","compatibility_flags":["global_fetch_strictly_public"],"workers_dev":true,"r2_buckets":[{"binding":"BUCKET","bucket_name":"xingleng-persona-memory"}],"vars":{"PUBLIC_BASE_URL":"","ALLOWED_GITHUB_USER_ID":"129664964"}}
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "xingleng-persona-memory",
+  "account_id": "ff52687595b64f602482d84cd351446a",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-23",
+  "compatibility_flags": [
+    "global_fetch_strictly_public"
+  ],
+  "workers_dev": true,
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "xingleng-persona-memory"
+    }
+  ],
+  "vars": {
+    "PUBLIC_BASE_URL": "https://xingleng-persona-memory.3350532354.workers.dev",
+    "ALLOWED_GITHUB_USER_ID": "129664964"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "ec3f335d1b3a4bc0b40c1f07c89a7fa0"
+    }
+  ]
+}

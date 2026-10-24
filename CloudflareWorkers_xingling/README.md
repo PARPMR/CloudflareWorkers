@@ -1,6 +1,6 @@
 # 星棱人格库：直接部署到 Cloudflare
 
-把本压缩包内的文件复制到 CloudflareWorkers 仓库根目录，保留原仓库的 .git 文件夹。不要把外层文件夹也套进仓库，根目录应能直接看到 package.json、wrangler.jsonc 和 src/。
+当前服务位于 CloudflareWorkers/CloudflareWorkers_xingling/。Cloudflare 的 Root directory 应填写相对于仓库根目录的 CloudflareWorkers_xingling，构建和部署命令均从此目录执行。无需移动已经上传的源码。
 
 此包是独立 Worker 服务源码，不是人格插件安装包。它不依赖 Sites；长期数据保存在你已创建的 R2 桶内。
 
@@ -17,7 +17,7 @@ GitHub 登录在此处只用于核实身份，申请 read:user，不用于写入
 
 ## 1. 复制、检查并推送
 
-在仓库根目录运行：
+在服务目录 CloudflareWorkers_xingling 中运行：
 
     npm install
     npm test
@@ -34,7 +34,7 @@ GitHub 登录在此处只用于核实身份，申请 read:user，不用于写入
 - Build command：npm run build
 - Deploy command：npx wrangler deploy
 - Preview builds：第一阶段关闭
-- Root directory：/（仓库根目录）
+- Root directory：CloudflareWorkers_xingling（服务所在子目录）
 
 wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提供设置状态：PUBLIC_BASE_URL 和 OAuth KV 未配置之前，/mcp 及其他私有数据接口返回 503，不读取或保存人格数据。/health 可用于检查服务和 R2 绑定。此时部署成功不等于登录或人格库连接完成。
 
@@ -56,7 +56,9 @@ wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提�
 
 - Application name：星棱人格库
 - Homepage URL：你的真实 Worker 地址
-- Authorization callback URL：你的真实 Worker 地址后加 /callback
+- Redirect URI（部分界面称 Authorization callback URL）：https://xingleng-persona-memory.3350532354.workers.dev/callback
+- Allow wildcard matching：关闭；Enable Device Flow：关闭
+- Expire user access tokens：保持开启。本服务只在登录回调中即时使用 GitHub token 核实身份，之后不保留或复用；MCP 授权令牌由本服务独立管理。
 
 不要在地址中保留示例文字。GitHub OAuth App 与此前用于仓库访问的第三方集成是两回事。
 
