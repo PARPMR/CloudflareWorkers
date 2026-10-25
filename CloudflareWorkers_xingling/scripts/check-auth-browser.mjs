@@ -46,15 +46,15 @@ try {
   const call=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
     const id=++nextId;pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method,params,...sessionId?{sessionId}:{}}));
   });
-  for(const decision of ['approve','deny']){
+  for(const {decision,optInWrite} of [{decision:'approve',optInWrite:false},{decision:'approve',optInWrite:true},{decision:'deny',optInWrite:false}]){
     const registration=await send(new Request(base+'/oauth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_name:'Browser regression client',redirect_uris:['https://client.example/callback'],grant_types:['authorization_code','refresh_token'],response_types:['code'],token_endpoint_auth_method:'none'})}));
     assert.equal(registration.status,201);
     const client=await registration.json();
     const url=new URL(base+'/authorize');
-    url.search=new URLSearchParams({client_id:client.client_id,redirect_uri:'https://client.example/callback',response_type:'code',scope:'mcp:read mcp:write offline_access',state:'browser-test-only',code_challenge:'x'.repeat(43),code_challenge_method:'S256'});
+    url.search=new URLSearchParams({client_id:client.client_id,redirect_uri:'https://client.example/callback',response_type:'code',scope:'mcp:read',state:'browser-test-only',code_challenge:'x'.repeat(43),code_challenge_method:'S256'});
     const {targetId}=await call('Target.createTarget',{url:'about:blank'});
     const {sessionId}=await call('Target.attachToTarget',{targetId,flatten:true});
-    const result={decision,cookieStored:false,postHasCookie:false,postStatus:null,postError:null,redirectReached:false,cspBlocked:false,errors:[]};
+    const result={decision,optInWrite,postedScopes:[],cookieStored:false,postHasCookie:false,postStatus:null,postError:null,redirectReached:false,cspBlocked:false,errors:[]};
     let loaded=false;
     const listener=async message=>{
       if(message.sessionId!==sessionId)return;
@@ -66,6 +66,7 @@ try {
       try{
         let response;
         if(parsed.origin===base){
+          if(request.method==='POST')result.postedScopes=new URLSearchParams(request.postData).getAll('scope');
           if(request.method==='POST')result.postHasCookie=Object.keys(request.headers).some(name=>name.toLowerCase()==='cookie'&&request.headers[name].includes('__Host-oauth-consent-'));
           response=await send(new Request(request.url,{method:request.method,headers:request.headers,...request.postData?{body:request.postData}:{}}));
           if(request.method==='POST'){result.postStatus=response.status;result.postError=response.headers.get('X-Xingleng-Auth-Error');}
@@ -91,6 +92,9 @@ try {
     assert.ok(loaded,'Consent page did not load');
     const cookies=await call('Network.getCookies',{urls:[base]},sessionId);
     result.cookieStored=cookies.cookies.some(cookie=>cookie.name.startsWith('__Host-oauth-consent-'));
+    const writeOption=await call('Runtime.evaluate',{expression:"({exists:!!document.querySelector('input[value=\"mcp:write\"]'),checked:document.querySelector('input[value=\"mcp:write\"]')?.checked})",returnByValue:true},sessionId);
+    assert.deepEqual(writeOption.result.value,{exists:true,checked:false},'Write must be offered but not preselected for a read-only request');
+    if(optInWrite)await call('Runtime.evaluate',{expression:"document.querySelector('input[value=\"mcp:write\"]').click()"},sessionId);
     await call('Runtime.evaluate',{expression:'document.querySelector(\'button[value="'+decision+'"]\').click()'},sessionId);
     for(let n=0;n<100&&!result.redirectReached&&!result.cspBlocked&&!result.postError;n++)await delay(50);
     console.log(JSON.stringify(result));
@@ -101,6 +105,7 @@ try {
     assert.ok(result.postHasCookie,'Browser must send the consent cookie with the form');
     assert.equal(result.cspBlocked,false,'CSP blocked the form redirect');
     assert.ok(result.redirectReached,'Browser did not reach the authorized redirect target');
+    assert.deepEqual(result.postedScopes,optInWrite?['mcp:read','mcp:write']:['mcp:read']);
   }
   await call('Browser.close');
 }finally{

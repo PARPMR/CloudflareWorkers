@@ -4,8 +4,9 @@ const redirect=(location,headers=new Headers())=>{
   headers.set('Location',location);return new Response(null,{status:302,headers});
 };
 function consent(details,handle) {
-  const scopes=details.scope.map(s=>'<label><input type="checkbox" name="scope" value="'+escape(s)+'" checked> '+escape(s)+'</label><br>').join('');
-  return '<!doctype html><meta charset="utf-8"><title>星棱人格库授权</title><h1>授权访问星棱人格库</h1><p>客户端：'+escape(details.clientName)+'</p><p>客户端来源：'+escape(details.clientDomain||'自行注册的客户端，名称未经验证')+'</p><p>授权返回地址：'+escape(details.redirectHost)+'</p>'+(details.redirectIsLoopback?'<p>此授权将返回本机应用，请确认是你刚发起的连接。</p>':'')+'<p>读取：查看长期设定。写入：在你逐项明确确认后保存或回滚。此授权不替代每条设定的确认。</p><form method="post"><input type="hidden" name="handle" value="'+escape(handle)+'">'+scopes+'<button name="decision" value="approve">同意并用 GitHub 登录</button> <button name="decision" value="deny">拒绝</button></form>';
+  const offered=[...new Set([...details.scope,'mcp:write'])];
+  const scopes=offered.map(s=>'<label><input type="checkbox" name="scope" value="'+escape(s)+'"'+(details.scope.includes(s)?' checked':'')+'> '+escape(s)+(s==='mcp:write'?' — 允许初始化、保存和回滚；每次变更仍需确认':'')+'</label><br>').join('');
+  return '<!doctype html><meta charset="utf-8"><title>星棱人格库授权</title><h1>授权访问星棱人格库</h1><p>客户端：'+escape(details.clientName)+'</p><p>客户端来源：'+escape(details.clientDomain||'自行注册的客户端，名称未经验证')+'</p><p>授权返回地址：'+escape(details.redirectHost)+'</p>'+(details.redirectIsLoopback?'<p>此授权将返回本机应用，请确认是你刚发起的连接。</p>':'')+'<p>读取：查看长期设定。写入：在你逐项明确确认后保存或回滚。此授权不替代每条设定的确认。需要初始化或保存时，请明确勾选 mcp:write；不勾选时保持只读。</p><form method="post"><input type="hidden" name="handle" value="'+escape(handle)+'">'+scopes+'<button name="decision" value="approve">同意并用 GitHub 登录</button> <button name="decision" value="deny">拒绝</button></form>';
 }
 function consentPolicy(redirectUri) {
   // Chromium also applies form-action to redirects after the POST. The callback

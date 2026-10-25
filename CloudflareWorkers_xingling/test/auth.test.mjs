@@ -5,14 +5,18 @@ import {authHandler} from '../src/auth.js';
 import {callTool} from '../src/store.js';
 const req=(name,headers={})=>new Request('https://persona.example/mcp',{method:'POST',headers,body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:{}}})});
 const bindings={ALLOWED_GITHUB_USER_ID:'129664964'};
-const challenge=()=>new Response(null,{status:403});
+const challenge=(_auth,scope)=>new Response(null,{status:403,headers:{'WWW-Authenticate':'Bearer error="insufficient_scope", error_description="Additional permission required", scope="'+scope.join(' ')+'", resource_metadata="https://persona.example/.well-known/oauth-protected-resource/mcp"'}});
 test('raw identity headers cannot authorize the service',async()=>{
  assert.equal((await apiHandler(req('xingleng_persona_read',{'oai-authenticated-user-id':'129664964'}),bindings,{},challenge)).status,401);
  await assert.rejects(callTool('xingleng_persona_read',{},req('x',{'oai-authenticated-user-id':'forged'}),{}),e=>e.code==='AUTH_REQUIRED');
 });
 test('verified identity must match owner and writes require scope',async()=>{
  assert.equal((await apiHandler(req('xingleng_persona_read'),bindings,{props:{githubId:'999'},auth:{scope:['mcp:read','mcp:write']}},challenge)).status,401);
- assert.equal((await apiHandler(req('xingleng_persona_commit'),bindings,{props:{githubId:'129664964'},auth:{scope:['mcp:read']}},challenge)).status,403);
+ const denied=await apiHandler(req('xingleng_persona_commit'),bindings,{props:{githubId:'129664964'},auth:{scope:['mcp:read']}},challenge);
+ assert.equal(denied.status,200);
+ const error=(await denied.json()).result;
+ assert.equal(error.isError,true);
+ assert.ok(error._meta['mcp/www_authenticate'][0].includes('mcp:write'));
 });
 test('consent escapes client metadata and prevents framing',async()=>{
  const oauth={parseAuthRequest:async()=>({redirectUri:'https://client.example/callback'}),describeConsent:async()=>({clientName:'<script>bad()</script>',redirectHost:'client.example',redirectUri:'https://client.example/callback',scope:['mcp:read']}),beginConsent:async()=>({handle:'handle',headers:new Headers()})};

@@ -11,7 +11,7 @@ export function setupReady(env){
 export default {
   async fetch(request,env,ctx){
     const url=new URL(request.url);
-    if(url.pathname==='/health')return Response.json({service:'xingleng-persona-memory',service_version:'1.2.2',engine_version:'1.2.0',storage_bound:!!env.BUCKET,oauth_configured:setupReady(env)},{headers:{'Cache-Control':'no-store'}});
+    if(url.pathname==='/health')return Response.json({service:'xingleng-persona-memory',service_version:'1.2.3',engine_version:'1.2.0',storage_bound:!!env.BUCKET,oauth_configured:setupReady(env)},{headers:{'Cache-Control':'no-store'}});
     if(!setupReady(env))return Response.json({status:'setup_required',message:'Configure OAuth KV, public base URL and GitHub OAuth credentials before connecting. No persona data is exposed.'},{status:503,headers:{'Cache-Control':'no-store'}});
     if(url.origin!==new URL(env.PUBLIC_BASE_URL).origin)return new Response('Use the configured service address.',{status:400});
     const provider=new OAuthProvider({

@@ -18,14 +18,25 @@ export async function apiHandler(request,env,ctx,insufficientScope) {
   let result;
   if(rpc.method==='initialize') {
     const supported=['2026-07-28','2025-11-25','2025-06-18','2025-03-26','2024-11-05'];
-    result={protocolVersion:supported.includes(rpc.params?.protocolVersion)?rpc.params.protocolVersion:'2026-07-28',serverInfo:{name:'xingleng-persona-memory',version:'1.2.2'},capabilities:{tools:{}}};
+    result={protocolVersion:supported.includes(rpc.params?.protocolVersion)?rpc.params.protocolVersion:'2026-07-28',serverInfo:{name:'xingleng-persona-memory',version:'1.2.3'},capabilities:{tools:{}}};
   }else if(rpc.method==='server/discover')result={supportedVersions:['2026-07-28'],capabilities:{tools:{}}};
   else if(rpc.method==='ping')result={};
   else if(rpc.method==='tools/list')result={tools};
   else if(rpc.method==='tools/call'){
-    if(writers.has(rpc.params?.name)&&!scope.includes('mcp:write'))return insufficientScope(ctx.auth,['mcp:read','mcp:write']);
+    if(writers.has(rpc.params?.name)&&!scope.includes('mcp:write')){
+      const required=['mcp:read','mcp:write'];
+      const reason='Read access is active. Authorize mcp:write to initialize, save or roll back persona settings; each change still requires confirmation.';
+      const challenge=insufficientScope(ctx.auth,required,reason).headers.get('WWW-Authenticate');
+      // A tool-level OAuth challenge lets ChatGPT request the declared scopes,
+      // while leaving the valid read-only connection and persona data intact.
+      return json({jsonrpc:'2.0',id:rpc.id,result:{isError:true,
+        content:[{type:'text',text:reason}],
+        structuredContent:{error:{code:'INSUFFICIENT_SCOPE',required_scopes:required}},
+        _meta:{'mcp/www_authenticate':[challenge]}}});
+    }
     try{
       const data=await callTool(rpc.params?.name,rpc.params?.arguments??{},request,env,'github:'+actor);
+      if(rpc.params?.name==='xingleng_persona_read')data.authorization={granted_scopes:[...scope],can_write:scope.includes('mcp:write')};
       result={content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data};
     }catch(error){
       result={isError:true,content:[{type:'text',text:JSON.stringify({error:{code:error.code??'INTERNAL_ERROR',message:error.code?error.message:'Storage service error; no success is claimed'}})}]};

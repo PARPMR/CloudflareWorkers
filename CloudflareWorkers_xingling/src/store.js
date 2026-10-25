@@ -184,7 +184,9 @@ const changeSchema={oneOf:[
   {type:'object',additionalProperties:false,properties:{kind:{const:'rollback'},target_revision:{type:'integer',minimum:1}},required:['kind','target_revision']}
 ]};
 function tool(name,description,properties={},required=[],write=false) {
+  const securitySchemes=[{type:'oauth2',scopes:write?['mcp:read','mcp:write']:['mcp:read']}];
   return {name,description,inputSchema:{type:'object',properties,required,additionalProperties:false},
+    securitySchemes,_meta:{securitySchemes},
     annotations:{readOnlyHint:!write,destructiveHint:write,idempotentHint:true,openWorldHint:false}};
 }
 export const tools=[

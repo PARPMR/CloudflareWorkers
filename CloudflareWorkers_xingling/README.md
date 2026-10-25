@@ -25,7 +25,7 @@ GitHub 登录在此处只用于核实身份，申请 read:user，不用于写入
 
 确认成功后，通过你自己的 GitHub 登录提交并推送。
 
-服务版本为 1.2.2，存储引擎仍为 1.2.0。真实依赖安装已完成，24 项本地测试和 Wrangler deploy --dry-run 打包通过，已生成 package-lock.json。新增集成测试使用真实 OAuth Provider 1.2.4 与加密/Cookie 流程；KV、GitHub 和 R2 仍用本地测试替身，不能当作真实账号登录或跨设备验收。npm run build 只检查项目配置。请将 package-lock.json 一同提交。
+服务版本为 1.2.3，存储引擎仍为 1.2.0。真实依赖安装已完成，27 项本地测试和 Wrangler deploy --dry-run 打包通过，已生成 package-lock.json。新增集成测试使用真实 OAuth Provider 1.2.4 与加密/Cookie 流程；KV、GitHub 和 R2 仍用本地测试替身，不能当作真实账号登录或跨设备验收。npm run build 只检查项目配置。请将 package-lock.json 一同提交。
 
 ## 2. Cloudflare 的 GitHub 部署页面
 
@@ -91,7 +91,7 @@ wrangler.jsonc 已包含实际账号和 R2 桶绑定。初次部署故意只提�
 - src/auth.js：每客户端授权、GitHub 登录、允许账号核验
 - src/api.js：只接受已验证 OAuth 上下文的 MCP 接口，执行读/写权限检查
 - src/store.js：人格数据校验、独立修订、ETag 条件写入、幂等与回滚
-- test/：24 项本地测试，包含真实 OAuth Provider 授权流程与安全错误诊断
+- test/：27 项本地测试，包含真实 OAuth Provider 授权流程与安全错误诊断
 - scripts/configure.mjs：填写真实 Worker URL 和 OAuth KV ID
 - wrangler.jsonc：Cloudflare 部署与绑定配置
 
@@ -132,3 +132,13 @@ Chromium/Edge 会将表单提交后的重定向纳入 form-action 检查。原�
 24 项 Node 测试通过。独立 Edge 测试验证 Cookie 保存与回传、同意进入模拟 GitHub、拒绝进入模拟客户端回调；测试拦截网络并使用本地数据，不登录真实 GitHub，也不读写云端人格。运行 npm run test:browser；默认使用本机 Edge，可通过 XINGLENG_TEST_BROWSER 指定 Chromium 可执行文件。测试使用独立浏览器配置目录（位于已忽略的 .wrangler 下）和仅本机可访问的临时调试端口。
 
 提交并 push 后，确认 /health 中 service_version=1.2.2，再从插件发起新的授权页。修复后的线上 OAuth 登录和跨设备读写仍需验收；本地浏览器测试不代表云端已连接。
+
+## 1.2.3 写权限与重授权
+
+真实 Provider 集成测试已复现：仅获 mcp:read 的令牌能读人格与历史，但 initialize 被不足权限拒绝。服务的授权服务器元数据有实际 /authorize 地址，客户端提示缺少 browser setup URL 的界面行为尚未直接复现。
+
+修复内容：所有工具声明实际 OAuth securitySchemes（写工具需要 mcp:read 和 mcp:write）；写权限不足时以工具错误返回 mcp/www_authenticate，包含 error、error_description、scope、resource_metadata；不再将这类工具错误仅作为 403 传输响应。授权页为仅请求读取的客户端提供默认不勾选的 mcp:write 选项；用户明确选择才授予。服务仍核验所有者身份、写权限与每次变更的确认。read 的 authorization.granted_scopes 与 authorization.can_write 仅报告当前令牌权限，不保存到人格文档。
+
+27 项 Node 测试及 3 种隔离 Edge 表单场景通过；完整本地流程覆盖读取令牌受限、主动选择写权限、授权后确认初始化与读回。GitHub、KV、R2 使用测试数据，不能当作线上初始化已完成。
+
+部署 1.2.3 后刷新原 XingLing 的工具元数据。在新授权页明确勾选 mcp:write，再读取 authorization.can_write。若原对话的 Reconnect 仍无法提供浏览器设置 URL，可在既有 XingLing 管理页通过 Connect another account 发起一次全新授权，使用相同 GitHub 身份；完成后在聊天中使用这次连接。是否成功仍以 can_write=true 和真实 initialize 后读回为准，不复制手工拼接的 /authorize 地址，不公开令牌。无需新建 Worker 或更换人格库。
